@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
 
-# Wait for PostgreSQL to be ready
-echo "Waiting for PostgreSQL to be ready..."
-until pg_isready -U ${POSTGRES_USER:-rakazo} -d ${POSTGRES_DB:-rakazo}; do
+# Wait for PostgreSQL to be ready using netcat
+echo "Waiting for PostgreSQL to be ready at ${DATABASE_URL}..."
+# Extract host and port from DATABASE_URL (assuming postgresql://user:pass@host:port/db)
+DB_HOST=$(echo $DATABASE_URL | sed -E 's/^.*@([^:]+):([0-9]+)\/.*$/\1/')
+DB_PORT=$(echo $DATABASE_URL | sed -E 's/^.*@([^:]+):([0-9]+)\/.*$/\2/')
+until nc -z "$DB_HOST" "$DB_PORT"; do
+  echo "PostgreSQL not ready yet, waiting 2s..."
   sleep 2
 done
 
