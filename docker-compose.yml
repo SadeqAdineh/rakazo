@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # Use Railway's PostgreSQL, so we don't run it here.
+  # But we need to define it as a dependency – we'll use an external service.
+  # We'll rely on Railway's managed PostgreSQL and pass DATABASE_URL via environment.
+
+  api:
+    image: ghcr.io/elie222/rakazo/api:edge
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=3100
+      - DATABASE_URL=${DATABASE_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SCREEN_PROXY_SECRET=${SCREEN_PROXY_SECRET}
+      - WEB_ORIGIN=${WEB_ORIGIN}
+      - BETTER_AUTH_URL=${WEB_ORIGIN}
+    ports:
+      - "3100:3100"
+    depends_on:
+      - postgres  # but we'll use external, so we'll remove depends_on or point to a service we create
+
+  worker:
+    image: ghcr.io/elie222/rakazo/worker:edge
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    depends_on:
+      - api
+
+  sandbox-supervisor:
+    image: ghcr.io/elie222/rakazo/sandbox-supervisor:edge
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - SUPERVISOR_HOST=0.0.0.0
+      - SUPERVISOR_PORT=7091
+      - SUPERVISOR_TOKEN=${SANDBOX_SUPERVISOR_TOKEN}
+    ports:
+      - "7091:7091"
+
+  web:
+    image: ghcr.io/elie222/rakazo/web:edge
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:-5173}          # Railway will inject PORT
+      - VITE_API_URL=http://api:3100
+      - PUBLIC_API_URL=http://api:3100
+      - BETTER_AUTH_URL=${WEB_ORIGIN}
+      - WEB_ORIGIN=${WEB_ORIGIN}
+    ports:
+      - "${PORT:-5173}:${PORT:-5173}"
+
+  # If you prefer to run your own PostgreSQL (not recommended on Railway), you can add it here:
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_USER: rakazo
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: rakazo
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
